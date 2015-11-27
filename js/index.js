@@ -9,83 +9,83 @@ var expBase2 = exp();
 // method
 function IEEE754Encoding(number, double) {
 
-    var pm = double ? BITS_MANT_DOUBLE: BITS_MANT_SIMPLE;
-    var pe = double ? BITS_EXP_DOUBLE : BITS_EXP_SIMPLE;
+  var pm = double ? BITS_MANT_DOUBLE: BITS_MANT_SIMPLE;
+  var pe = double ? BITS_EXP_DOUBLE : BITS_EXP_SIMPLE;
 
-	// - convert and normalize the integer part into binary
-    //    - by splitting number into integer/fraction
-    //    - and computing binary representation
+  // - convert and normalize the integer part into binary
+  //    - by splitting number into integer/fraction
+  //    - and computing binary representation
 
-    // integer
-	var int = floor(number);
-    var bInt = numToBinaryStr(int);
+  // integer
+  var int = floor(number);
+  var bInt = numToBinaryStr(int);
 
-    console.log('binary int ' + bInt);
+  console.log('binary int ' + bInt);
 
-    // fraction (decimal)
-    var fraction = number - int,
-    	bDec = '',
-        i = 0,
-    	space = pm - bInt.length; // mantissa free space
+  // fraction (decimal)
+  var fraction = number - int,
+      bDec = '',
+      i = 0,
+      space = pm - bInt.length; // mantissa free space
 
-    while (i++ < space) {
-        var value = fraction * 2;
+  while (i++ < space) {
+    var value = fraction * 2;
 
-        if (value === 0) break;
+    if (value === 0) break;
 
-        var int = floor(value);
-        bDec += '' + int;
-        fraction = value - int;
-    }
+    var int = floor(value);
+    bDec += '' + int;
+    fraction = value - int;
+  }
 
-    // normalise decimal position to get exponent
-    var isZero = false;
-    var idx = -1;
-    var exposant = bInt.length - 1;
-    if (exposant == 0) {
-        idx = bDec.indexOf('1') + 1;
-    	exposant = -idx;
-        isZero = true;
-    }
+  // normalise decimal position to get exponent
+  var isZero = false;
+  var idx = -1;
+  var exposant = bInt.length - 1;
+  if (exposant == 0) {
+      idx = bDec.indexOf('1') + 1;
+    exposant = -idx;
+      isZero = true;
+  }
 
-    // (51,375)10  = (1, 10011011000)base2x2^5
-    console.log('('+number+') base 10 = ('+bInt+','+bDec+')base 2 * 2^' +exposant);
+  // (51,375)10  = (1, 10011011000)base2x2^5
+  console.log('('+number+') base 10 = ('+bInt+','+bDec+')base 2 * 2^' +exposant);
 
-    // remove first useless bit
-    bDec = !isZero ? bDec : bDec.substring(idx);
-    var mantis = bInt.substring(1, bInt.length) + bDec;
+  // remove first useless bit
+  bDec = !isZero ? bDec : bDec.substring(idx);
+  var mantis = bInt.substring(1, bInt.length) + bDec;
 
-    console.log(mantis);
+  console.log(mantis);
 
-    if (mantis.length < pm) {
-        mantis = fillBits(mantis, pm - mantis.length, true);
-    }
+  if (mantis.length < pm) {
+      mantis = fillBits(mantis, pm - mantis.length, true);
+  }
 
-    check(exposant, mantis);
+  check(exposant, mantis);
 
-    // binary exposant
-    exposant += double ? 1023 : 127;
+  // binary exposant
+  exposant += double ? 1023 : 127;
 
-    console.log('final exposant ' + exposant);
+  console.log('final exposant ' + exposant);
 
-    exposant = numToBinaryStr(exposant);
+  exposant = numToBinaryStr(exposant);
 
-    console.log('binary exposant ' + exposant);
+  console.log('binary exposant ' + exposant);
 
-    if (exposant.length < pe) {
-        exposant = fillBits(exposant, pe - exposant.length);
-    }
+  if (exposant.length < pe) {
+      exposant = fillBits(exposant, pe - exposant.length);
+  }
 
-    console.log('binary exposant ' + exposant);
+  console.log('binary exposant ' + exposant);
 
-    console.log('IEEE 754 normalisation value ');
-    console.log('1 ' + exposant + ' ' + mantis);
+  console.log('IEEE 754 normalisation value ');
+  console.log('1 ' + exposant + ' ' + mantis);
 
-    return {
-    	sign: '1',
-        exponent: exposant,
-        mantis: mantis
-    }
+  return {
+    sign: '1',
+      exponent: exposant,
+      mantis: mantis
+  }
 }
 
 // https://books.google.fr/books?id=4RChxt67lvwC&pg=PA35&lpg=PA35&dq=javascript+integer+to+binary+representation&source=bl&ots=thZ9FhLTp2&sig=TslfYziR2WFoaUPkrmkgkVZYGt8&hl=fr&sa=X&ved=0ahUKEwjdhrv-ybDJAhXHLhoKHYx7D8M4ChDoAQg_MAQ#v=onepage&q=javascript%20integer%20to%20binary%20representation&f=false
@@ -93,21 +93,34 @@ function IEEE754Encoding(number, double) {
 function charEncoding(number, signed) {
   var positive = false;
 
-  if (signed && number > 0x7F) {
-    return '0' + (0x7F >>> 0).toString(2);
+  if (signed) {
+    if (number >= 0x7F) {
+      return '0' + (0x7F >>> 0).toString(2);
+    }
+
+    if (number < -127) {
+      return (0x81 >>> 0).toString(2);
+    }
+
   }
 
-  if (signed && number < -127) {
-    return (0x81 >>> 0).toString(2);
+  if (!signed) {
+    if (number < 0x00) {
+      return fillBits((0x00 >>> 0).toString(2), 7);
+    }
+
+    if (number > 0xFF) {
+      return (0xFF >>> 0).toString(2);
+    }
   }
 
-  var bits = ((Math.abs(number) & 0x000000FF) >>> 0).toString(2);
+  var bits = ((Math.abs(number) & 0xFF) >>> 0).toString(2);
 
   if (signed) {
-    return number > 0 ? '0' + bits : '1' + bits;
+    return number > 0 ? '0' + fillBits(bits, 7-bits.length) : '1' + fillBits(bits, 7 - bits.length);
   }
 
-  return bits;
+  return fillBits(bits, 8 - bits.length);
 }
 
 // https://en.wikipedia.org/wiki/Single-precision_floating-point_format
@@ -129,71 +142,96 @@ IEEE754Encoding(3.14);
 // GRAPHICS
 
 var targetId = '#ieee754';
+var unsignedCharId = '#unsignedChar';
+var signedCharId = '#signedChar';
 
 var svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
+var svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
+var svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 100);
 
-drawText('Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
-drawText('Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
+drawText(svgContainer, 'Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
+drawText(svgContainer, 'Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
+drawText(svgContainerUC, 'Unsigned char (8-bit)', 0, 20, '30px');
+drawText(svgContainerSC, 'Signed char (8-bit)', 0, 20, '30px');
 
 var value = 2.25;
 
 var norm = IEEE754Encoding(value);
-draw(norm.sign, "#DADEE2", "#4679BD", 0, 50);
-draw(norm.exponent, "#DADEE2", "#DE407D", 30, 50);
-draw(norm.mantis, "#DADEE2", "#4679BD", 250, 50);
+draw(svgContainer, norm.sign, "#BDD4B3", "#159957", 0, 50);
+draw(svgContainer, norm.exponent, "#DADEE2", "#DE407D", 30, 50);
+draw(svgContainer, norm.mantis, "#DADEE2", "#4679BD", 250, 50);
 
 var normDouble = IEEE754Encoding(value, true);
-draw(normDouble.sign, "#DADEE2", "#4679BD", 0, 200);
-draw(normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
-draw(normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
+draw(svgContainer, normDouble.sign, "#BDD4B3", "#159957", 0, 200);
+draw(svgContainer, normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
+draw(svgContainer, normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
+
+var int = floor(value);
+
+var charUnsigned = charEncoding(int);
+var charSigned = charEncoding(int, true);
+draw(svgContainerUC, charUnsigned, "#DADEE2", "#DE407D", 0, 50);
+draw(svgContainerSC, charSigned, "#DADEE2", "#DE407D", 0, 50);
 
 // when the input range changes update value
 d3.select("#number").on("input", function() {
   var value = this.value;
-  console.log(isNaN(value));
 
   if (isNaN(value)) return;
 
-  d3.select("svg").remove();
+  var int = floor(value);
+
+  d3.select(targetId).select("svg").remove();
+  d3.select(unsignedCharId).select("svg").remove();
+  d3.select(signedCharId).select("svg").remove();
+
   svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
+  svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
+  svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 100);
+
+  drawText(svgContainer, 'Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
+  drawText(svgContainer, 'Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
+  drawText(svgContainerUC, 'Unsigned char (8-bit)', 0, 20, '30px');
+  drawText(svgContainerSC, 'Signed char (8-bit)', 0, 20, '30px');
 
   var norm = IEEE754Encoding(value);
-  draw(norm.sign, "#DADEE2", "#4679BD", 0, 50);
-  draw(norm.exponent, "#DADEE2", "#DE407D", 30, 50);
-  draw(norm.mantis, "#DADEE2", "#4679BD", 250, 50);
+  draw(svgContainer, norm.sign, "#BDD4B3", "#159957", 0, 50);
+  draw(svgContainer, norm.exponent, "#DADEE2", "#DE407D", 30, 50);
+  draw(svgContainer, norm.mantis, "#DADEE2", "#4679BD", 250, 50);
 
   var normDouble = IEEE754Encoding(value, true);
-  draw(normDouble.sign, "#DADEE2", "#4679BD", 0, 200);
-  draw(normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
-  draw(normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
+  draw(svgContainer, normDouble.sign, "#BDD4B3", "#159957", 0, 200);
+  draw(svgContainer, normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
+  draw(svgContainer, normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
+
+  var charUnsigned = charEncoding(int);
+  draw(svgContainerUC, charUnsigned, "#DADEE2", "#DE407D", 0, 50);
+
+  var charSigned = charEncoding(int, true);
+  draw(svgContainerSC, charSigned, "#DADEE2", "#DE407D", 0, 50);
+
 });
 
-function draw(bits, color1, color2, padX, padY) {
-    var w = 10;
+function draw(container, bits, color1, color2, padX, padY) {
+  var w = 10;
 
-    for (var i=0;i<bits.length; i++) {
-        var v = bits[i];
-        var x = 2*i*w;
+  for (var i=0;i<bits.length; i++) {
+    var v = bits[i];
+    var x = 2*i*w;
 
-        svgContainer.append("rect")
-		.attr("x", x+padX).attr("y", 10+padY)
-		.attr("width", w).attr("height", 10)
-        .style("fill", function(d, i) {
-          return v === '0' ? color1 : color2;
-        });
+    container.append("rect")
+      .attr("x", x+padX).attr("y", 10+padY)
+      .attr("width", w).attr("height", 10)
+      .style("fill", function(d, i) {
+        return v === '0' ? color1 : color2;
+      });
 
-        drawText(v, x+2+padX, 30+padY, '10px');
-
-    }
+    drawText(container, v, x+2+padX, 30+padY, '10px');
+  }
 }
 
-function drawText(txt, x, y, size) {
-    svgContainer.append("text")
-        .attr("x", x)
-        .attr("y", y)
-        .attr("dy", ".35em")
-        .style("font-size",size)
-        .text(txt);
+function drawText(container, txt, x, y, size) {
+  container.append("text").attr("x", x).attr("y", y).attr("dy", ".35em").style("font-size",size).text(txt);
 }
 
 // UTILS
@@ -225,7 +263,7 @@ function fillBits(s, length, suffix) {
 }
 
 function check(exposant, mantis) {
-	var check = expBase2(exposant);
+  var check = expBase2(exposant);
 
     for (var j=0; j<mantis.length; j++) {
      var bit = mantis[j];
