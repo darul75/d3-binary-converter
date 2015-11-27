@@ -4,6 +4,33 @@ var BITS_MANT_DOUBLE = 52;
 var BITS_EXP_SIMPLE = 8;
 var BITS_EXP_DOUBLE = 11;
 
+var TYPES_BOUND = {
+  char: {
+      bits: 8,
+      mask: 0xFF,
+      unsigned : {
+          low: {value: 0x00, replace: 0x00},
+          high: {value: 0xFF, replace: 0xFF}
+      },
+      signed : {
+          low: {value: -127, replace: 0x81},
+          high: {value: 0x7F, replace: 0x7F}
+      }
+  },
+  short: {
+      bits: 16,
+      mask: 0xFFFF,
+      unsigned : {
+          low: {value: 0x00, replace: 0x00},
+          high: {value: 0xFFFF, replace: 0xFFFF}
+      },
+      signed : {
+          low: {value: -32767, replace: 0x8001},
+          high: {value: 32767, replace: 0x7FFF}
+      }
+  }
+}
+
 var expBase2 = exp();
 
 // method
@@ -88,39 +115,40 @@ function IEEE754Encoding(number, double) {
   }
 }
 
+// http://www.binaryconvert.com/
 // https://books.google.fr/books?id=4RChxt67lvwC&pg=PA35&lpg=PA35&dq=javascript+integer+to+binary+representation&source=bl&ots=thZ9FhLTp2&sig=TslfYziR2WFoaUPkrmkgkVZYGt8&hl=fr&sa=X&ved=0ahUKEwjdhrv-ybDJAhXHLhoKHYx7D8M4ChDoAQg_MAQ#v=onepage&q=javascript%20integer%20to%20binary%20representation&f=false
 // http://www.theirishpenguin.com/2013/08/02/batshift-crazy-basic-binary-number-representation-in-javascript.html
-function charEncoding(number, signed) {
+function charEncoding(number, signed, rules) {
   var positive = false;
 
   if (signed) {
-    if (number >= 0x7F) {
-      return '0' + (0x7F >>> 0).toString(2);
+    if (number >= rules.signed.high.value) {
+      return '0' + (rules.signed.high.replace >>> 0).toString(2);
     }
 
-    if (number < -127) {
-      return (0x81 >>> 0).toString(2);
+    if (number < rules.signed.low.value) {
+      return (rules.signed.low.replace >>> 0).toString(2);
     }
 
   }
 
   if (!signed) {
-    if (number < 0x00) {
-      return fillBits((0x00 >>> 0).toString(2), 7);
+    if (number < rules.unsigned.low.value) {
+      return fillBits((rules.unsigned.low.replace >>> 0).toString(2), rules.bits-1);
     }
 
-    if (number > 0xFF) {
-      return (0xFF >>> 0).toString(2);
+    if (number > rules.unsigned.high.value) {
+      return (rules.unsigned.high.value >>> 0).toString(2);
     }
   }
 
-  var bits = ((Math.abs(number) & 0xFF) >>> 0).toString(2);
+  var bits = ((Math.abs(number) & rules.mask) >>> 0).toString(2);
 
   if (signed) {
-    return number > 0 ? '0' + fillBits(bits, 7-bits.length) : '1' + fillBits(bits, 7 - bits.length);
+    return number > 0 ? '0' + fillBits(bits, rules.bits-1-bits.length) : '1' + fillBits(bits, rules.bits-1 - bits.length);
   }
 
-  return fillBits(bits, 8 - bits.length);
+  return fillBits(bits, rules.bits - bits.length);
 }
 
 // https://en.wikipedia.org/wiki/Single-precision_floating-point_format
@@ -144,15 +172,21 @@ IEEE754Encoding(3.14);
 var targetId = '#ieee754';
 var unsignedCharId = '#unsignedChar';
 var signedCharId = '#signedChar';
+var unsignedShortId = '#unsignedShort';
+var signedShortId = '#signedShort';
 
 var svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
 var svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
 var svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 100);
+var svgContainerUS = d3.select(unsignedShortId).append("svg").attr("width", 500).attr("height", 100);
+var svgContainerSS = d3.select(signedShortId).append("svg").attr("width", 500).attr("height", 100);
 
 drawText(svgContainer, 'Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
 drawText(svgContainer, 'Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
 drawText(svgContainerUC, 'Unsigned char (8-bit)', 0, 20, '30px');
 drawText(svgContainerSC, 'Signed char (8-bit)', 0, 20, '30px');
+drawText(svgContainerUS, 'Unsigned char (16-bit)', 0, 20, '30px');
+drawText(svgContainerSS, 'Signed char (16-bit)', 0, 20, '30px');
 
 var value = 2.25;
 
@@ -168,10 +202,16 @@ draw(svgContainer, normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
 
 var int = floor(value);
 
-var charUnsigned = charEncoding(int);
-var charSigned = charEncoding(int, true);
+var charUnsigned = charEncoding(int, false, TYPES_BOUND.char);
+var charSigned = charEncoding(int, true, TYPES_BOUND.char);
+var shortUnsigned = charEncoding(int, false, TYPES_BOUND.short);
+var shortSigned = charEncoding(int, true, TYPES_BOUND.short);
+
 draw(svgContainerUC, charUnsigned, "#DADEE2", "#DE407D", 0, 50);
 draw(svgContainerSC, charSigned, "#DADEE2", "#DE407D", 0, 50);
+
+draw(svgContainerUS, shortUnsigned, "#DADEE2", "#DE407D", 0, 50);
+draw(svgContainerSS, shortSigned, "#DADEE2", "#DE407D", 0, 50);
 
 // when the input range changes update value
 d3.select("#number").on("input", function() {
@@ -184,6 +224,8 @@ d3.select("#number").on("input", function() {
   d3.select(targetId).select("svg").remove();
   d3.select(unsignedCharId).select("svg").remove();
   d3.select(signedCharId).select("svg").remove();
+  d3.select(unsignedShortId).select("svg").remove();
+  d3.select(signedShortId).select("svg").remove();
 
   svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
   svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
@@ -204,11 +246,17 @@ d3.select("#number").on("input", function() {
   draw(svgContainer, normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
   draw(svgContainer, normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
 
-  var charUnsigned = charEncoding(int);
+  var charUnsigned = charEncoding(int, false, TYPES_BOUND.char);
   draw(svgContainerUC, charUnsigned, "#DADEE2", "#DE407D", 0, 50);
 
-  var charSigned = charEncoding(int, true);
+  var charSigned = charEncoding(int, true, TYPES_BOUND.char);
   draw(svgContainerSC, charSigned, "#DADEE2", "#DE407D", 0, 50);
+
+  var shortUnsigned = charEncoding(int, false, TYPES_BOUND.short);
+  draw(svgContainerUS, shortUnsigned, "#DADEE2", "#DE407D", 0, 50);
+
+  var shortSigned = charEncoding(int, true, TYPES_BOUND.short);
+  draw(svgContainerSS, shortSigned, "#DADEE2", "#DE407D", 0, 50);
 
 });
 
