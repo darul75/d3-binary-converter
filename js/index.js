@@ -230,11 +230,15 @@ d3.select("#number").on("input", function() {
   svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
   svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
   svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 100);
+  svgContainerUS = d3.select(unsignedShortId).append("svg").attr("width", 500).attr("height", 100);
+  svgContainerSS = d3.select(signedShortId).append("svg").attr("width", 500).attr("height", 100);
 
   drawText(svgContainer, 'Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
   drawText(svgContainer, 'Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
   drawText(svgContainerUC, 'Unsigned char (8-bit)', 0, 20, '30px');
   drawText(svgContainerSC, 'Signed char (8-bit)', 0, 20, '30px');
+  drawText(svgContainerUS, 'Unsigned char (16-bit)', 0, 20, '30px');
+  drawText(svgContainerSS, 'Signed char (16-bit)', 0, 20, '30px');
 
   var norm = IEEE754Encoding(value);
   draw(svgContainer, norm.sign, "#BDD4B3", "#159957", 0, 50);
