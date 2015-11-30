@@ -13,7 +13,7 @@ var TYPES_BOUND = {
           high: {value: 0xFF, replace: 0xFF}
       },
       signed : {
-          low: {value: -127, replace: 0x81},
+          low: {value: -128, replace: 0x80},
           high: {value: 0x7F, replace: 0x7F}
       }
   },
@@ -25,62 +25,68 @@ var TYPES_BOUND = {
           high: {value: 0xFFFF, replace: 0xFFFF}
       },
       signed : {
-          low: {value: -32767, replace: 0x8001},
+          low: {value: -32768, replace: 0x8000},
           high: {value: 32767, replace: 0x7FFF}
+      }
+  },
+  integer: {
+      bits: 32,
+      mask: 0xFFFFFFFFFFFF,
+      unsigned : {
+          low: {value: 0x00, replace: 0x00},
+          high: {value: 0xFFFFFFFF, replace: 0xFFFFFFFF}
+      },
+      signed : {
+          low: {value: -2147483648, replace: 0x80000000},
+          high: {value: 2147483647, replace: 0x7FFFFFFF}
       }
   }
 }
 
 var expBase2 = exp();
 
-// method
-function IEEE754Encoding(number, double) {
+/**
+ * Encodes in IEEE754.
+ * @param {string} number - string representation of number.
+ * @param {string} double - precision, single or double (float/double).
+ *
+ * @return {object} info.
+ */
+function encoderIEEE754(number, double) {
 
   var pm = double ? BITS_MANT_DOUBLE: BITS_MANT_SIMPLE;
   var pe = double ? BITS_EXP_DOUBLE : BITS_EXP_SIMPLE;
 
-  // - convert and normalize the integer part into binary
-  //    - by splitting number into integer/fraction
-  //    - and computing binary representation
-
-  // integer
-  var int = floor(number);
-  var bInt = numToBinaryStr(int);
-
-  console.log('binary int ' + bInt);
-
-  // fraction (decimal)
-  var fraction = number - int,
-      bDec = '',
-      i = 0,
-      space = pm - bInt.length; // mantissa free space
-
-  while (i++ < space) {
-    var value = fraction * 2;
-
-    if (value === 0) break;
-
-    var int = floor(value);
-    bDec += '' + int;
-    fraction = value - int;
+  if (number > Number.MAX_SAFE_INTEGER) {
+    number = ''+Number.MAX_SAFE_INTEGER;
   }
 
-  // normalise decimal position to get exponent
+  // integer
+  var int = floor(Math.abs(number));
+  var bInt = binaryInteger(int);
+
+  // fraction (decimal)
+  var bDec = binaryDecimal(number, pm);
+
+  console.log('binary integer part: ' + bInt);
+  console.log('binary decimal part: ' + bDec);
+
+  // normalize decimal position to get exponent
   var isZero = false;
   var idx = -1;
   var exposant = bInt.length - 1;
   if (exposant == 0) {
-      idx = bDec.indexOf('1') + 1;
+    idx = bDec.indexOf('1') + 1;
     exposant = -idx;
-      isZero = true;
+    isZero = true;
   }
-
-  // (51,375)10  = (1, 10011011000)base2x2^5
-  console.log('('+number+') base 10 = ('+bInt+','+bDec+')base 2 * 2^' +exposant);
 
   // remove first useless bit
   bDec = !isZero ? bDec : bDec.substring(idx);
   var mantis = bInt.substring(1, bInt.length) + bDec;
+
+  // (51,375)10  = (1, 10011011000)base2x2^5
+  console.log('('+number+') base 10 = (1,'+mantis+')base 2 * 2^' +exposant);
 
   console.log(mantis);
 
@@ -93,9 +99,13 @@ function IEEE754Encoding(number, double) {
   // binary exposant
   exposant += double ? 1023 : 127;
 
+  if (number == 0) {
+    exposant = 0;
+  }
+
   console.log('final exposant ' + exposant);
 
-  exposant = numToBinaryStr(exposant);
+  exposant = binaryInteger(exposant);
 
   console.log('binary exposant ' + exposant);
 
@@ -106,12 +116,18 @@ function IEEE754Encoding(number, double) {
   console.log('binary exposant ' + exposant);
 
   console.log('IEEE 754 normalisation value ');
-  console.log('1 ' + exposant + ' ' + mantis);
+
+  var sign = floor(number) >= 0 ? '0' : '1';
+
+  var finalBits = sign + exposant + mantis;
+
+  console.log(finalBits);
 
   return {
-    sign: '1',
-      exponent: exposant,
-      mantis: mantis
+    sign: sign,
+    exponent: exposant,
+    mantis: mantis,
+    hex: binStringToHex(finalBits).toUpperCase()
   }
 }
 
@@ -120,35 +136,43 @@ function IEEE754Encoding(number, double) {
 // http://www.theirishpenguin.com/2013/08/02/batshift-crazy-basic-binary-number-representation-in-javascript.html
 function charEncoding(number, signed, rules) {
   var positive = false;
+  var value = '';
 
   if (signed) {
     if (number >= rules.signed.high.value) {
-      return '0' + (rules.signed.high.replace >>> 0).toString(2);
+      value = '0' + (rules.signed.high.replace >>> 0).toString(2);
+      return { value: value, hex: binStringToHex(value) };
     }
 
     if (number < rules.signed.low.value) {
-      return (rules.signed.low.replace >>> 0).toString(2);
+      value = (rules.signed.low.replace >>> 0).toString(2);
+      return { value: value, hex: binStringToHex(value) };
     }
 
   }
 
   if (!signed) {
     if (number < rules.unsigned.low.value) {
-      return fillBits((rules.unsigned.low.replace >>> 0).toString(2), rules.bits-1);
+      value = fillBits((rules.unsigned.low.replace >>> 0).toString(2), rules.bits-1);
+      return { value: value, hex: binStringToHex(value) };
     }
 
     if (number > rules.unsigned.high.value) {
-      return (rules.unsigned.high.value >>> 0).toString(2);
+      value = (rules.unsigned.high.value >>> 0).toString(2);
+      return { value: value, hex: binStringToHex(value) };
     }
   }
 
   var bits = ((Math.abs(number) & rules.mask) >>> 0).toString(2);
 
   if (signed) {
-    return number > 0 ? '0' + fillBits(bits, rules.bits-1-bits.length) : '1' + fillBits(bits, rules.bits-1 - bits.length);
+    value = number > 0 ? '0' + fillBits(bits, rules.bits-1-bits.length) : '1' + fillBits(bits, rules.bits-1 - bits.length);
+    return { value: value, hex: binStringToHex(value) };
   }
 
-  return fillBits(bits, rules.bits - bits.length);
+  value = fillBits(bits, rules.bits - bits.length);
+
+  return { value: value, hex: binStringToHex(value) };
 }
 
 // https://en.wikipedia.org/wiki/Single-precision_floating-point_format
@@ -174,31 +198,39 @@ var unsignedCharId = '#unsignedChar';
 var signedCharId = '#signedChar';
 var unsignedShortId = '#unsignedShort';
 var signedShortId = '#signedShort';
+var unsignedIntegerId = '#unsignedInteger';
+var signedIntegerId = '#signedInteger';
 
 var svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
-var svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
-var svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 100);
-var svgContainerUS = d3.select(unsignedShortId).append("svg").attr("width", 500).attr("height", 100);
-var svgContainerSS = d3.select(signedShortId).append("svg").attr("width", 500).attr("height", 100);
+var svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 150);
+var svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 150);
+var svgContainerUS = d3.select(unsignedShortId).append("svg").attr("width", 500).attr("height", 150);
+var svgContainerSS = d3.select(signedShortId).append("svg").attr("width", 500).attr("height", 150);
+var svgContainerUI = d3.select(unsignedIntegerId).append("svg").attr("width", 650).attr("height", 150);
+var svgContainerSI = d3.select(signedIntegerId).append("svg").attr("width", 650).attr("height", 150);
 
 drawText(svgContainer, 'Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
 drawText(svgContainer, 'Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
-drawText(svgContainerUC, 'Unsigned char (8-bit)', 0, 20, '30px');
-drawText(svgContainerSC, 'Signed char (8-bit)', 0, 20, '30px');
-drawText(svgContainerUS, 'Unsigned char (16-bit)', 0, 20, '30px');
-drawText(svgContainerSS, 'Signed char (16-bit)', 0, 20, '30px');
+drawText(svgContainerUC, 'Unsigned Char (8-bit)', 0, 20, '30px');
+drawText(svgContainerSC, 'Signed Char (8-bit)', 0, 20, '30px');
+drawText(svgContainerUS, 'Unsigned Short (16-bit)', 0, 20, '30px');
+drawText(svgContainerSS, 'Signed Short (16-bit)', 0, 20, '30px');
+drawText(svgContainerUI, 'Unsigned Integer (32-bit)', 0, 20, '30px');
+drawText(svgContainerSI, 'Signed Integer (32-bit)', 0, 20, '30px');
 
 var value = 2.25;
 
-var norm = IEEE754Encoding(value);
+var norm = encoderIEEE754(value);
 draw(svgContainer, norm.sign, "#BDD4B3", "#159957", 0, 50);
 draw(svgContainer, norm.exponent, "#DADEE2", "#DE407D", 30, 50);
 draw(svgContainer, norm.mantis, "#DADEE2", "#4679BD", 250, 50);
+drawText(svgContainer, '0x' + norm.hex, 0, 110, '15px');
 
-var normDouble = IEEE754Encoding(value, true);
+var normDouble = encoderIEEE754(value, true);
 draw(svgContainer, normDouble.sign, "#BDD4B3", "#159957", 0, 200);
 draw(svgContainer, normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
 draw(svgContainer, normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
+drawText(svgContainer, '0x' + normDouble.hex, 0, 260, '15px');
 
 var int = floor(value);
 
@@ -206,12 +238,26 @@ var charUnsigned = charEncoding(int, false, TYPES_BOUND.char);
 var charSigned = charEncoding(int, true, TYPES_BOUND.char);
 var shortUnsigned = charEncoding(int, false, TYPES_BOUND.short);
 var shortSigned = charEncoding(int, true, TYPES_BOUND.short);
+var intUnsigned = charEncoding(int, false, TYPES_BOUND.integer);
+var intSigned = charEncoding(int, true, TYPES_BOUND.integer);
 
-draw(svgContainerUC, charUnsigned, "#DADEE2", "#DE407D", 0, 50);
-draw(svgContainerSC, charSigned, "#DADEE2", "#DE407D", 0, 50);
+draw(svgContainerUC, charUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
+drawText(svgContainerUC, '0x' + charUnsigned.hex, 0, 110, '15px');
 
-draw(svgContainerUS, shortUnsigned, "#DADEE2", "#DE407D", 0, 50);
-draw(svgContainerSS, shortSigned, "#DADEE2", "#DE407D", 0, 50);
+draw(svgContainerSC, charSigned.value, "#DADEE2", "#DE407D", 0, 50);
+drawText(svgContainerSC, '0x' + charSigned.hex, 0, 110, '15px');
+
+draw(svgContainerUS, shortUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
+drawText(svgContainerUS, '0x' + shortUnsigned.hex, 0, 110, '15px');
+
+draw(svgContainerSS, shortSigned.value, "#DADEE2", "#DE407D", 0, 50);
+drawText(svgContainerSS, '0x' + shortSigned.hex, 0, 110, '15px');
+
+draw(svgContainerUI, intUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
+drawText(svgContainerUI, '0x' + intUnsigned.hex, 0, 110, '15px');
+
+draw(svgContainerSI, intSigned.value, "#DADEE2", "#DE407D", 0, 50);
+drawText(svgContainerSI, '0x' + intSigned.hex, 0, 110, '15px');
 
 // when the input range changes update value
 d3.select("#number").on("input", function() {
@@ -226,41 +272,61 @@ d3.select("#number").on("input", function() {
   d3.select(signedCharId).select("svg").remove();
   d3.select(unsignedShortId).select("svg").remove();
   d3.select(signedShortId).select("svg").remove();
+  d3.select(unsignedIntegerId).select("svg").remove();
+  d3.select(signedIntegerId).select("svg").remove();
 
   svgContainer = d3.select(targetId).append("svg").attr("width", 800).attr("height", 300);
-  svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 100);
-  svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 100);
-  svgContainerUS = d3.select(unsignedShortId).append("svg").attr("width", 500).attr("height", 100);
-  svgContainerSS = d3.select(signedShortId).append("svg").attr("width", 500).attr("height", 100);
+  svgContainerUC = d3.select(unsignedCharId).append("svg").attr("width", 500).attr("height", 150);
+  svgContainerSC = d3.select(signedCharId).append("svg").attr("width", 500).attr("height", 150);
+  svgContainerUS = d3.select(unsignedShortId).append("svg").attr("width", 500).attr("height", 150);
+  svgContainerSS = d3.select(signedShortId).append("svg").attr("width", 500).attr("height", 150);
+  svgContainerUI = d3.select(unsignedIntegerId).append("svg").attr("width", 650).attr("height", 150);
+  svgContainerSI = d3.select(signedIntegerId).append("svg").attr("width", 650).attr("height", 150);
 
   drawText(svgContainer, 'Float (IEEE754 Single precision 32-bit)', 0, 20, '30px');
   drawText(svgContainer, 'Double (IEEE754 Double precision 64-bit)', 0, 150, '30px');
-  drawText(svgContainerUC, 'Unsigned char (8-bit)', 0, 20, '30px');
-  drawText(svgContainerSC, 'Signed char (8-bit)', 0, 20, '30px');
-  drawText(svgContainerUS, 'Unsigned char (16-bit)', 0, 20, '30px');
-  drawText(svgContainerSS, 'Signed char (16-bit)', 0, 20, '30px');
+  drawText(svgContainerUC, 'Unsigned Char (8-bit)', 0, 20, '30px');
+  drawText(svgContainerSC, 'Signed Char (8-bit)', 0, 20, '30px');
+  drawText(svgContainerUS, 'Unsigned Short (16-bit)', 0, 20, '30px');
+  drawText(svgContainerSS, 'Signed Short (16-bit)', 0, 20, '30px');
+  drawText(svgContainerUI, 'Unsigned Integer (32-bit)', 0, 20, '30px');
+  drawText(svgContainerSI, 'Signed Integer (32-bit)', 0, 20, '30px');
 
-  var norm = IEEE754Encoding(value);
+  var norm = encoderIEEE754(value);
   draw(svgContainer, norm.sign, "#BDD4B3", "#159957", 0, 50);
   draw(svgContainer, norm.exponent, "#DADEE2", "#DE407D", 30, 50);
   draw(svgContainer, norm.mantis, "#DADEE2", "#4679BD", 250, 50);
+  drawText(svgContainer, '0x' + norm.hex, 0, 110, '15px');
 
-  var normDouble = IEEE754Encoding(value, true);
+  var normDouble = encoderIEEE754(value, true);
   draw(svgContainer, normDouble.sign, "#BDD4B3", "#159957", 0, 200);
   draw(svgContainer, normDouble.exponent, "#DADEE2", "#DE407D", 30, 200);
   draw(svgContainer, normDouble.mantis, "#DADEE2", "#4679BD", 300, 200);
+  drawText(svgContainer, '0x' + normDouble.hex, 0, 260, '15px');
 
   var charUnsigned = charEncoding(int, false, TYPES_BOUND.char);
-  draw(svgContainerUC, charUnsigned, "#DADEE2", "#DE407D", 0, 50);
+  draw(svgContainerUC, charUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
+  drawText(svgContainerUC, '0x' + charUnsigned.hex, 0, 110, '15px');
 
   var charSigned = charEncoding(int, true, TYPES_BOUND.char);
-  draw(svgContainerSC, charSigned, "#DADEE2", "#DE407D", 0, 50);
+  draw(svgContainerSC, charSigned.value, "#DADEE2", "#DE407D", 0, 50);
+  drawText(svgContainerUC, '0x' + charSigned.hex, 0, 110, '15px');
 
   var shortUnsigned = charEncoding(int, false, TYPES_BOUND.short);
-  draw(svgContainerUS, shortUnsigned, "#DADEE2", "#DE407D", 0, 50);
+  draw(svgContainerUS, shortUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
+  drawText(svgContainerUS, '0x' + shortUnsigned.hex, 0, 110, '15px');
 
   var shortSigned = charEncoding(int, true, TYPES_BOUND.short);
-  draw(svgContainerSS, shortSigned, "#DADEE2", "#DE407D", 0, 50);
+  draw(svgContainerSS, shortSigned.value, "#DADEE2", "#DE407D", 0, 50);
+  drawText(svgContainerUS, '0x' + shortSigned.hex, 0, 110, '15px');
+
+  var intUnsigned = charEncoding(int, false, TYPES_BOUND.integer);
+  draw(svgContainerUI, intUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
+  drawText(svgContainerUI, '0x' + intUnsigned.hex, 0, 110, '15px');
+
+  var intSigned = charEncoding(int, true, TYPES_BOUND.integer);
+  draw(svgContainerSI, intSigned.value, "#DADEE2", "#DE407D", 0, 50);
+  drawText(svgContainerSI, '0x' + intSigned.hex, 0, 110, '15px');
 
 });
 
@@ -288,8 +354,52 @@ function drawText(container, txt, x, y, size) {
 
 // UTILS
 
-// convert number into a binary string
-function numToBinaryStr(num) { return (num >>> 0).toString(2); }
+/**
+ * Encodes integer number's part into binary.
+ .
+ * @param {string} number - string representation of number.
+ * @param {string} double - precision, single or double (float/double).
+ *
+ * @return {string} binary string.
+ */
+function binaryInteger(num) {
+  return (num).toString(2);
+  //return (num >>> 0).toString(2);
+}
+
+
+/**
+ * Encodes decimal number's part into binary.
+ .
+ * @param {string} number - string representation of number.
+ * @param {string} double - precision, single or double (float/double).
+ *
+ * @return {string} binary string.
+ */
+function binaryDecimal(number, precision) {
+  var int = floor(Math.abs(number));
+  var bInt = binaryInteger(int);
+  var numberStr = ''+number,
+
+  fraction = numberStr.substring(numberStr.indexOf('.')).trim(),
+  bDec = '',
+  i = 0,
+  space = precision - bInt.length; // mantissa free space
+
+  if (numberStr.indexOf('.') >= 0 && fraction > 0) {
+    while (i++ <= space) {
+      var value = fraction * 2;
+      bDec += '' + floor(value);
+
+      if (value === 1) break;
+
+      var valueStr = ''+value;
+      fraction = valueStr.substring(valueStr.indexOf('.')).trim();
+    }
+  }
+
+  return bDec;
+}
 
 // fetch integer number part
 function floor(num) { return Math.floor(num); }
@@ -326,6 +436,15 @@ function check(exposant, mantis) {
 
     console.log('check');
     console.log(check);
+}
+
+function binStringToHex(s) {
+
+  var pattern = /([0|1]{4})/g;
+
+  return s.replace(pattern, function(match, i) {
+    return parseInt(match, 2).toString(16);
+  });
 }
 
 // max : Math.pow(2, 23) - 1
