@@ -141,12 +141,12 @@ function charEncoding(number, signed, rules) {
   if (signed) {
     if (number >= rules.signed.high.value) {
       value = '0' + (rules.signed.high.replace >>> 0).toString(2);
-      return { value: value, hex: binStringToHex(value) };
+      return { value: value, hex: binStringToHex(value).toUpperCase() };
     }
 
     if (number < rules.signed.low.value) {
       value = (rules.signed.low.replace >>> 0).toString(2);
-      return { value: value, hex: binStringToHex(value) };
+      return { value: value, hex: binStringToHex(value).toUpperCase() };
     }
 
   }
@@ -154,12 +154,12 @@ function charEncoding(number, signed, rules) {
   if (!signed) {
     if (number < rules.unsigned.low.value) {
       value = fillBits((rules.unsigned.low.replace >>> 0).toString(2), rules.bits-1);
-      return { value: value, hex: binStringToHex(value) };
+      return { value: value, hex: binStringToHex(value).toUpperCase() };
     }
 
     if (number > rules.unsigned.high.value) {
       value = (rules.unsigned.high.value >>> 0).toString(2);
-      return { value: value, hex: binStringToHex(value) };
+      return { value: value, hex: binStringToHex(value).toUpperCase() };
     }
   }
 
@@ -167,12 +167,12 @@ function charEncoding(number, signed, rules) {
 
   if (signed) {
     value = fillBits(bits, rules.bits-bits.length);
-    return { value: value, hex: binStringToHex(value) };
+    return { value: value, hex: binStringToHex(value).toUpperCase() };
   }
 
   value = fillBits(bits, rules.bits - bits.length);
 
-  return { value: value, hex: binStringToHex(value) };
+  return { value: value, hex: binStringToHex(value).toUpperCase() };
 }
 
 // https://en.wikipedia.org/wiki/Single-precision_floating-point_format
