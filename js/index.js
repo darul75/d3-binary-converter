@@ -163,10 +163,10 @@ function charEncoding(number, signed, rules) {
     }
   }
 
-  var bits = ((Math.abs(number) & rules.mask) >>> 0).toString(2);
+  var bits = (number & rules.mask).toString(2);
 
   if (signed) {
-    value = number > 0 ? '0' + fillBits(bits, rules.bits-1-bits.length) : '1' + fillBits(bits, rules.bits-1 - bits.length);
+    value = fillBits(bits, rules.bits-bits.length);
     return { value: value, hex: binStringToHex(value) };
   }
 
@@ -310,7 +310,7 @@ d3.select("#number").on("input", function() {
 
   var charSigned = charEncoding(int, true, TYPES_BOUND.char);
   draw(svgContainerSC, charSigned.value, "#DADEE2", "#DE407D", 0, 50);
-  drawText(svgContainerUC, '0x' + charSigned.hex, 0, 110, '15px');
+  drawText(svgContainerSC, '0x' + charSigned.hex, 0, 110, '15px');
 
   var shortUnsigned = charEncoding(int, false, TYPES_BOUND.short);
   draw(svgContainerUS, shortUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
@@ -318,7 +318,7 @@ d3.select("#number").on("input", function() {
 
   var shortSigned = charEncoding(int, true, TYPES_BOUND.short);
   draw(svgContainerSS, shortSigned.value, "#DADEE2", "#DE407D", 0, 50);
-  drawText(svgContainerUS, '0x' + shortSigned.hex, 0, 110, '15px');
+  drawText(svgContainerSS, '0x' + shortSigned.hex, 0, 110, '15px');
 
   var intUnsigned = charEncoding(int, false, TYPES_BOUND.integer);
   draw(svgContainerUI, intUnsigned.value, "#DADEE2", "#DE407D", 0, 50);
