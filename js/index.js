@@ -163,7 +163,7 @@ function charEncoding(number, signed, rules) {
     }
   }
 
-  var bits = (number & rules.mask).toString(2);
+  var bits = binarySignInteger(number & rules.mask);
 
   if (signed) {
     value = fillBits(bits, rules.bits-bits.length);
@@ -365,6 +365,10 @@ function drawText(container, txt, x, y, size) {
 function binaryInteger(num) {
   return (num).toString(2);
   //return (num >>> 0).toString(2);
+}
+
+function binarySignInteger(num) {
+  return (num >>> 0).toString(2);
 }
 
 
