@@ -75,7 +75,7 @@ function encoderIEEE754(number, double) {
   var isZero = false;
   var idx = -1;
   var exposant = bInt.length - 1;
-  if (exposant == 0) {
+  if (exposant == 0 && bInt == 0) {
     idx = bDec.indexOf('1') + 1;
     exposant = -idx;
     isZero = true;
